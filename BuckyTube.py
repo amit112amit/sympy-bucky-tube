@@ -6,30 +6,29 @@ This module provides function to create a zig-zag Bucky tube
 import sympy as sp
 import vtk as v
 import numpy as np
+import collections as col
 
 """
 The following function creates points lying on a flat plate
 that can be rolled up into a cylinder. We assume that the plate
 is lying in the x-y plane at a constant value of z = -R
-r : lattice spacing for the triangular lattice
-W : Width in units of r ( should be odd )
-H : Height in units of r
-R : Radius of the cylinder formed after rolling-up
-To get a closed cylinder R == (W - 1)/(2*pi)
+W : Width in units of lattice spacing ( should be odd )
+H : Height in units of lattice spacing
 """
-def generateRollableFlatPlate( r, W, H, R ):
+def generateRollableFlatPlate( W, H ):
+    R = (W-1)/(2*sp.pi)
     points = []
     z = -R
 
     for i in range(H):
-        y = -i*r*sp.sqrt(3)*sp.Rational(1,2)
+        y = -i*sp.sqrt(3)*sp.Rational(1,2)
         if i%2 == 0:
             x = 0
         else:
-            x = r*sp.Rational(1,2)
+            x = sp.Rational(1,2)
 
         for j in range(W):
-            p = [ x + j*r, y, z ]
+            p = [ x + j, y, z ]
             points.append( p )
 
     return points
@@ -45,7 +44,8 @@ def generateCylinderFromPlate( points ):
     for p in points:
         theta = p[0]/R - sp.pi*sp.Rational(1,2)
         c = [ R*sp.cos( theta ), p[1], R*sp.sin( theta ) ]
-        cylinderPoints.append(c)
+        if c not in cylinderPoints:
+            cylinderPoints.append(c)
     return cylinderPoints
 
 """
@@ -92,7 +92,7 @@ def generateMeshPolyData( points ):
             for i in range(3):
                 newTriangles.InsertCellPoint( int( origIds.GetTuple1(
                     triIds.GetId(i) ) ) )
-    pd.SetPolys( newTriangles )
+                pd.SetPolys( newTriangles )
     return pd
 
 """
@@ -100,13 +100,12 @@ The following function uses the above SymPy function
 to calculate numeric values for points on a flat plate and
 writes it to a vtkPolyData file for visualization in Paraview.
 """
-def generatePlateVTK( r, W, H, R, fileName ):
+def generatePlateVTK( W, H, fileName ):
     # Symbolic computations
-    rs,Rs = sp.symbols( 'r,R' )
-    platePoints = generateRollableFlatPlate( rs, W, H, R )
+    platePoints = generateRollableFlatPlate( W, H )
     # Numerical computations
-    plateFunc = sp.lambdify( (rs, Rs), platePoints )
-    realPlatePoints = np.array( plateFunc( r, R ) )
+    plateFunc = sp.lambdify( (), platePoints )
+    realPlatePoints = np.array( plateFunc() )
     # Generate connectivity
     pd = generateMeshPolyData( realPlatePoints )
     # Write PolyData to file
@@ -122,45 +121,61 @@ The following function uses the above two SymPy functions
 to calculate numeric values for points on a cylinder and
 writes it to a vtkPolyData file for visualization in Paraview.
 """
-def generateCylinderVTK( r, W, H, R, fileName ):
+def generateCylinderVTK( W, H, fileName ):
     # Symbolic computations
-    rs,Rs = sp.symbols( 'r,R' )
-    platePoints = generateRollableFlatPlate( rs, W, H, R )
+    platePoints = generateRollableFlatPlate( W, H )
     cylinderPoints = generateCylinderFromPlate( platePoints )
     # Numerical computations
-    plateFunc = sp.lambdify( (rs, Rs), platePoints )
-    cylFunc = sp.lambdify( (rs, Rs), cylinderPoints )
-    realPlatePoints = np.array( plateFunc( r, R ) )
-    realCylPoints = np.array( cylFunc( r, R ) )
+    plateFunc = sp.lambdify( (), platePoints )
+    cylFunc = sp.lambdify( (), cylinderPoints )
+    realPlatePoints = np.array( plateFunc() )
+    realCylPoints = np.array( cylFunc() )
     # Generate delaunay triangulation of the flat plate
-    plateTri = generateMeshPolyData( realPlatePoints )
+    plateTriPoly = generateMeshPolyData( realPlatePoints )
+    plateTri = plateTriPoly.GetPolys()
+    # Create a mapping from plate point Ids to cylinder ids
+    # to handle the overlapping points on the seam
+    A = np.array([i for i in range(H*W)])
+    B = np.array([i for i in range(H)])
+    A = A.reshape( (H,W) )
+    B = B.reshape( (H,1) )
+    A = A - B
+    A[:,W-1] = A[:,0]
+    A = A.reshape( (H*W,) )
+    plateToCylDict = {}
+    for i in range( H*W ):
+        plateToCylDict[i] = A[i]
+    # Now create the cylinder PolyData
     cylPoints = v.vtkPoints()
     for p in realCylPoints:
         cylPoints.InsertNextPoint( p )
     cylPoly = v.vtkPolyData()
     cylPoly.SetPoints( cylPoints )
-    cylPoly.SetPolys( plateTri.GetPolys() )
-    # We have coincident points at the seam that we need to clean
-    cd = v.vtkCleanPolyData()
-    cd.SetInputData( cylPoly )
-    cd.SetTolerance( 1e-3 )
-    cd.PointMergingOn()
-    cd.Update()
+    cylTri = v.vtkCellArray()
+    triIds = v.vtkIdList()
+    plateTri.InitTraversal()
+    while plateTri.GetNextCell( triIds ):
+        pt0 = triIds.GetId(0)
+        pt1 = triIds.GetId(1)
+        pt2 = triIds.GetId(2)
+        cylTri.InsertNextCell( 3 )
+        cylTri.InsertCellPoint( plateToCylDict[ pt0 ] )
+        cylTri.InsertCellPoint( plateToCylDict[ pt1 ] )
+        cylTri.InsertCellPoint( plateToCylDict[ pt2 ] )
+    cylPoly.SetPolys( cylTri )
     # Write the cylinder to a VTK file
     w = v.vtkPolyDataWriter()
-    w.SetInputData( cd.GetOutput() )
+    #w.SetInputData( cd.GetOutput() )
+    w.SetInputData( cylPoly )
     w.SetFileName( fileName )
     w.Write()
     return
 
 if __name__ == "__main__":
-    """
-    Test the functions that we wrote above
-    """
+
+    #Test the functions that we wrote above
     W = 13
     H = 7
-    r = 1.0
-    R = (W-1)/(2*np.pi)
-    generatePlateVTK( r, W, H, R, 'plate.vtk' )
+    generatePlateVTK( W, H, 'plate.vtk' )
     print('Generating cylinder.')
-    generateCylinderVTK( r, W, H, R, 'cyl.vtk' )
+    generateCylinderVTK( W, H, 'cyl.vtk' )
