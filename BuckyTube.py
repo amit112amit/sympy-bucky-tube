@@ -135,16 +135,13 @@ def generateCylinderVTK( W, H, fileName ):
     plateTri = plateTriPoly.GetPolys()
     # Create a mapping from plate point Ids to cylinder ids
     # to handle the overlapping points on the seam
-    A = np.array([i for i in range(H*W)])
+    plateToCylIndexMap = np.array([i for i in range(H*W)])
     B = np.array([i for i in range(H)])
-    A = A.reshape( (H,W) )
+    plateToCylIndexMap = plateToCylIndexMap.reshape( (H,W) )
     B = B.reshape( (H,1) )
-    A = A - B
-    A[:,W-1] = A[:,0]
-    A = A.reshape( (H*W,) )
-    plateToCylDict = {}
-    for i in range( H*W ):
-        plateToCylDict[i] = A[i]
+    plateToCylIndexMap = plateToCylIndexMap - B
+    plateToCylIndexMap[:,W-1] = plateToCylIndexMap[:,0]
+    plateToCylIndexMap = plateToCylIndexMap.reshape( (H*W,) )
     # Now create the cylinder PolyData
     cylPoints = v.vtkPoints()
     for p in realCylPoints:
@@ -159,9 +156,9 @@ def generateCylinderVTK( W, H, fileName ):
         pt1 = triIds.GetId(1)
         pt2 = triIds.GetId(2)
         cylTri.InsertNextCell( 3 )
-        cylTri.InsertCellPoint( plateToCylDict[ pt0 ] )
-        cylTri.InsertCellPoint( plateToCylDict[ pt1 ] )
-        cylTri.InsertCellPoint( plateToCylDict[ pt2 ] )
+        cylTri.InsertCellPoint( plateToCylIndexMap[ pt0 ] )
+        cylTri.InsertCellPoint( plateToCylIndexMap[ pt1 ] )
+        cylTri.InsertCellPoint( plateToCylIndexMap[ pt2 ] )
     cylPoly.SetPolys( cylTri )
     # Write the cylinder to a VTK file
     w = v.vtkPolyDataWriter()
