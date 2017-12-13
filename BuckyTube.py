@@ -1,6 +1,6 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 """
-This module provides function to create a zig-zag Bucky tube
+This module provides functions to create a zig-zag Bucky tube
 """
 
 import sympy as sp
@@ -100,9 +100,7 @@ The following function uses the above SymPy function
 to calculate numeric values for points on a flat plate and
 writes it to a vtkPolyData file for visualization in Paraview.
 """
-def generatePlateVTK( W, H, fileName ):
-    # Symbolic computations
-    platePoints = generateRollableFlatPlate( W, H )
+def generatePlateVTK( platePoints, fileName ):
     # Numerical computations
     plateFunc = sp.lambdify( (), platePoints )
     realPlatePoints = np.array( plateFunc() )
@@ -121,13 +119,11 @@ The following function uses the above two SymPy functions
 to calculate numeric values for points on a cylinder and
 writes it to a vtkPolyData file for visualization in Paraview.
 """
-def generateCylinderVTK( W, H, fileName ):
-    # Symbolic computations
-    platePoints = generateRollableFlatPlate( W, H )
-    cylinderPoints = generateCylinderFromPlate( platePoints )
+def generateCylinderVTK( W, H, platePoints, cylPoints, writeFile=False,
+                        fileName='cylinder.vtk' ):
     # Numerical computations
     plateFunc = sp.lambdify( (), platePoints )
-    cylFunc = sp.lambdify( (), cylinderPoints )
+    cylFunc = sp.lambdify( (), cylPoints )
     realPlatePoints = np.array( plateFunc() )
     realCylPoints = np.array( cylFunc() )
     # Generate delaunay triangulation of the flat plate
@@ -160,19 +156,44 @@ def generateCylinderVTK( W, H, fileName ):
         cylTri.InsertCellPoint( plateToCylIndexMap[ pt1 ] )
         cylTri.InsertCellPoint( plateToCylIndexMap[ pt2 ] )
     cylPoly.SetPolys( cylTri )
-    # Write the cylinder to a VTK file
-    w = v.vtkPolyDataWriter()
-    #w.SetInputData( cd.GetOutput() )
-    w.SetInputData( cylPoly )
-    w.SetFileName( fileName )
-    w.Write()
-    return
+    if writeFile:
+        # Write the cylinder to a VTK file
+        w = v.vtkPolyDataWriter()
+        #w.SetInputData( cd.GetOutput() )
+        w.SetInputData( cylPoly )
+        w.SetFileName( fileName )
+        w.Write()
+    return cylPoly
+
+# This function extracts from a VTK polydata object a list of lists
+# representing the edges of the polydata
+def makeListFromCellArray( poly ):
+    listOut = []
+    edgeExt = v.vtkExtractEdges()
+    edgeExt.SetInputData( poly )
+    edgeExt.Update()
+    edges = edgeExt.GetOutput()
+    ids = v.vtkIdList()
+    cells = edges.GetLines()
+    cells.InitTraversal()
+    while cells.GetNextCell( ids ):
+        connectivity = []
+        for i in range( ids.GetNumberOfIds() ):
+            connectivity.append( ids.GetId( i ) )
+        listOut.append( connectivity )
+    return listOut
 
 if __name__ == "__main__":
 
     #Test the functions that we wrote above
     W = 13
     H = 7
-    generatePlateVTK( W, H, 'plate.vtk' )
+    # Symbolic computations
+    platePoints = generateRollableFlatPlate( W, H )
+    cylinderPoints = generateCylinderFromPlate( platePoints )
+
+    generatePlateVTK( platePoints, 'plate.vtk' )
     print('Generating cylinder.')
-    generateCylinderVTK( W, H, 'cyl.vtk' )
+    generateCylinderVTK( W, H, platePoints, cylPoints, writeFile=True,
+                        fileName='cyl.vtk' )
+
