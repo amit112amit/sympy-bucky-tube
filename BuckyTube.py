@@ -169,17 +169,22 @@ def generateCylinderVTK( W, H, platePoints, cylPoints, writeFile=False,
 # representing the edges of the polydata
 def makeListFromCellArray( poly ):
     listOut = []
+    idf = v.vtkIdFilter()
+    idf.SetInputData( poly )
+    idf.SetIdsArrayName( 'OrigIds' )
+    idf.PointIdsOn()
     edgeExt = v.vtkExtractEdges()
-    edgeExt.SetInputData( poly )
+    edgeExt.SetInputConnection( idf.GetOutputPort() )
     edgeExt.Update()
     edges = edgeExt.GetOutput()
+    origIds = edges.GetPointData().GetArray('OrigIds')
     ids = v.vtkIdList()
     cells = edges.GetLines()
     cells.InitTraversal()
     while cells.GetNextCell( ids ):
         connectivity = []
         for i in range( ids.GetNumberOfIds() ):
-            connectivity.append( ids.GetId( i ) )
+            connectivity.append( int( origIds.GetTuple1( ids.GetId( i ) ) ) )
         listOut.append( connectivity )
     return listOut
 

@@ -24,7 +24,7 @@ cylinder = b.generateCylinderVTK( W, H, platePoints, cylPoints,
 connectivity = b.makeListFromCellArray( cylinder )
 
 # Iterate over all the bonds and calculate the circularity and normality energy
-#circEn = 0
+circEn = 0
 normEn = 0
 for bond in connectivity:
     i,j = bond
@@ -32,15 +32,13 @@ for bond in connectivity:
     ptj = cylPoints[j]
     ni = normals[i]
     nj = normals[j]
-    m =  (nj[0] - ni[0])**2 + (nj[1] - ni[1])**2 + (nj[2] - ni[2])**2
-    #p = [ nj[z] + ni[z] for z in range(3) ]
-    rij = [ ptj[z] - pti[z] for z in range(3) ]
-    r = (pti[0] - ptj[0])**2 + (pti[1] - ptj[1])**2 + (pti[2] - ptj[2])**2
+    m =  sum( [ (nj[z] - ni[z])**2 for z in range(3) ] )
+    r =  sum( [ (ptj[z] - pti[z])**2 for z in range(3) ] )
+    circTerm = sum( [ (ni[z] + nj[z])*(ptj[z]-pti[z]) for z in range(3) ] )
     kernel = sp.exp( -r*sp.Rational(1,2) )
-    #circTerm = ( p[0]*rij[0] + p[1]*rij[1] + p[2]*rij[2] )**2/r
-    #circEn += circEn + kernel*circTerm
-    normEn += normEn + kernel*m
+    circEn += kernel*circTerm**2/r
+    normEn += kernel*m
 
-K = sp.Symbol( 'kappa', real=True, positive=True )
-#circEn = K*sp.simplify( circEn )
+K = sp.Symbol( 'kappa' )
+circEn = K*circEn
 normEn = K*sp.simplify( normEn )
