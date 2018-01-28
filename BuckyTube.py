@@ -23,12 +23,12 @@ def generateRollableFlatPlate( W, H ):
     for i in range(H):
         y = -i*sp.sqrt(3)*sp.Rational(1,2)
         if i%2 == 0:
-            x = 0
+            x0 = 0
         else:
-            x = sp.Rational(1,2)
+            x0 = sp.Rational(1,2)
 
         for j in range(W):
-            p = [ x + j, y, z ]
+            p = [ x0 + j, y, z ]
             points.append( p )
 
     return points
@@ -140,10 +140,17 @@ def generateCylinderVTK( W, H, platePoints, cylPoints, writeFile=False,
     plateToCylIndexMap = plateToCylIndexMap.reshape( (H*W,) )
     # Now create the cylinder PolyData
     cylPoints = v.vtkPoints()
+    normals = v.vtkDoubleArray()
+    normals.SetNumberOfComponents(3)
+    normals.SetName('PointNormals')
     for p in realCylPoints:
         cylPoints.InsertNextPoint( p )
+        x,_,z = p
+        R = np.sqrt(x**2 + z**2)
+        normals.InsertNextTuple3( x/R, 0, z/R )
     cylPoly = v.vtkPolyData()
     cylPoly.SetPoints( cylPoints )
+    cylPoly.GetPointData().SetNormals( normals )
     cylTri = v.vtkCellArray()
     triIds = v.vtkIdList()
     plateTri.InitTraversal()
@@ -167,7 +174,7 @@ def generateCylinderVTK( W, H, platePoints, cylPoints, writeFile=False,
 
 # This function extracts from a VTK polydata object a list of lists
 # representing the edges of the polydata
-def makeListFromCellArray( poly ):
+def makeConnectivityList( poly ):
     listOut = []
     idf = v.vtkIdFilter()
     idf.SetInputData( poly )
@@ -191,11 +198,11 @@ def makeListFromCellArray( poly ):
 if __name__ == "__main__":
 
     #Test the functions that we wrote above
-    W = 13
-    H = 7
+    W = 21
+    H = 2
     # Symbolic computations
     platePoints = generateRollableFlatPlate( W, H )
-    cylinderPoints = generateCylinderFromPlate( platePoints )
+    cylPoints = generateCylinderFromPlate( platePoints )
 
     generatePlateVTK( platePoints, 'plate.vtk' )
     print('Generating cylinder.')

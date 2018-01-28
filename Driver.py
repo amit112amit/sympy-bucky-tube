@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 
 import sympy as sp
+import sympy.physics.vector as v
 import BuckyTube as b
 
+sp.init_printing()
 # Make flat plate points
-W = 9
+W = 21
 H = 3
 
 # Symbolic computations
@@ -21,24 +23,25 @@ for pt in cylPoints:
 # Get bonds connectivity for energy calculations
 cylinder = b.generateCylinderVTK( W, H, platePoints, cylPoints,
                                 writeFile=True)
-connectivity = b.makeListFromCellArray( cylinder )
+connectivity = b.makeConnectivityList( cylinder )
 
 # Iterate over all the bonds and calculate the circularity and normality energy
+N = v.ReferenceFrame('N')
 circEn = 0
 normEn = 0
 for bond in connectivity:
     i,j = bond
-    pti = cylPoints[i]
-    ptj = cylPoints[j]
-    ni = normals[i]
-    nj = normals[j]
-    m =  sum( [ (nj[z] - ni[z])**2 for z in range(3) ] )
-    r =  sum( [ (ptj[z] - pti[z])**2 for z in range(3) ] )
-    circTerm = sum( [ (ni[z] + nj[z])*(ptj[z]-pti[z]) for z in range(3) ] )
-    kernel = sp.exp( -r*sp.Rational(1,2) )
-    circEn += kernel*circTerm**2/r
+    pti = cylPoints[i][0]*N.x + cylPoints[i][1]*N.y + cylPoints[i][2]*N.z
+    ptj = cylPoints[j][0]*N.x + cylPoints[j][1]*N.y + cylPoints[j][2]*N.z
+    ni = normals[i][0]*N.x + normals[i][1]*N.y + normals[i][2]*N.z
+    nj = normals[j][0]*N.x + normals[j][1]*N.y + normals[j][2]*N.z
+    m = (nj - ni).dot( (nj - ni) ) 
+    circTerm = ((ni + nj).dot(ptj - pti))**2
+    kernel = sp.exp( -sp.Rational(1,2) )
+    circEn += kernel*circTerm
     normEn += kernel*m
 
 K = sp.Symbol( 'kappa' )
 circEn = K*circEn
+circEn = K*sp.simplify( circEn )
 normEn = K*sp.simplify( normEn )
