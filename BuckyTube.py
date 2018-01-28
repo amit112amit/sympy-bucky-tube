@@ -16,18 +16,18 @@ W : Width in units of lattice spacing ( should be odd )
 H : Height in units of lattice spacing
 """
 def generateRollableFlatPlate( W, H ):
-    R = (W-1)/(2*sp.pi)
+    R = W/(2*sp.pi)
     points = []
     z = -R
 
-    for i in range(H):
+    for i in range(H+1):
         y = -i*sp.sqrt(3)*sp.Rational(1,2)
         if i%2 == 0:
             x0 = 0
         else:
             x0 = sp.Rational(1,2)
 
-        for j in range(W):
+        for j in range(W+1):
             p = [ x0 + j, y, z ]
             points.append( p )
 
@@ -131,13 +131,13 @@ def generateCylinderVTK( W, H, platePoints, cylPoints, writeFile=False,
     plateTri = plateTriPoly.GetPolys()
     # Create a mapping from plate point Ids to cylinder ids
     # to handle the overlapping points on the seam
-    plateToCylIndexMap = np.array([i for i in range(H*W)])
-    B = np.array([i for i in range(H)])
-    plateToCylIndexMap = plateToCylIndexMap.reshape( (H,W) )
-    B = B.reshape( (H,1) )
+    plateToCylIndexMap = np.array([i for i in range((H+1)*(W+1))])
+    B = np.array([i for i in range(H+1)])
+    plateToCylIndexMap = plateToCylIndexMap.reshape( (H+1,W+1) )
+    B = B.reshape( (H+1,1) )
     plateToCylIndexMap = plateToCylIndexMap - B
-    plateToCylIndexMap[:,W-1] = plateToCylIndexMap[:,0]
-    plateToCylIndexMap = plateToCylIndexMap.reshape( (H*W,) )
+    plateToCylIndexMap[:,W] = plateToCylIndexMap[:,0]
+    plateToCylIndexMap = plateToCylIndexMap.reshape( ((H+1)*(W+1),) )
     # Now create the cylinder PolyData
     cylPoints = v.vtkPoints()
     normals = v.vtkDoubleArray()
@@ -198,8 +198,8 @@ def makeConnectivityList( poly ):
 if __name__ == "__main__":
 
     #Test the functions that we wrote above
-    W = 21
-    H = 2
+    W = 20
+    H = 1
     # Symbolic computations
     platePoints = generateRollableFlatPlate( W, H )
     cylPoints = generateCylinderFromPlate( platePoints )

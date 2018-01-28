@@ -6,15 +6,15 @@ import BuckyTube as b
 
 sp.init_printing()
 # Make flat plate points
-W = 21
-H = 3
+W = 20
+H = 2
 
 # Symbolic computations
 platePoints = b.generateRollableFlatPlate( W, H )
 cylPoints = b.generateCylinderFromPlate( platePoints )
 
 # Calculate the normals for all the points
-R = (W-1)/(2*sp.pi)
+R = W/(2*sp.pi)
 normals = []
 for pt in cylPoints:
     x,_,z = pt
@@ -41,7 +41,7 @@ for bond in connectivity:
     circEn += kernel*circTerm
     normEn += kernel*m
 
-K = sp.Symbol( 'kappa' )
+K = sp.Symbol( 'K' )
 circEn = K*circEn
 circEn = K*sp.simplify( circEn )
 normEn = K*sp.simplify( normEn )
